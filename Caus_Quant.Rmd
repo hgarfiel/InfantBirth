@@ -1,0 +1,169 @@
+---
+title: "PS3"
+output: word_document
+---
+```{r,include=FALSE}
+library(foreign)
+library(quantreg)
+setwd("~/Documents/MSE/GSE526")
+d = read.dta("paeco526W16_ps2.dta")
+d1 = read.dta("paeco526W16_qr_ps3.dta")
+```
+
+
+##Problem 1
+###a)
+```{r}
+fit1 = lm(dbirwt~tobacco,data = d)
+(summary(fit1))
+```
+The coefficient on the smoking indicator would only represent a causal efect on infant birthweight if whether or not a mother smoked during pregnancy was determined completely at random. This would make the treatment (smoking) independent and therefore uncorrelated with any other variable or possible confounder, and allow us to compare the treatment and control groups under the assumption that they have the same characteristics on average. Clearly, this is not a plausible assumption in this case because whether or not a mother smokes during pregnancy is not determined at random, and is probably related to other attributes and health risks (nor could it be assigned at random, ethically speaking). 
+
+###b)
+```{r}
+db = d[,-c(18,32,35)]#gets rid of "preterm", "deadkids", and "cdbirwt2500" covariates 
+
+fit2 = lm(dbirwt~., data = db)
+(summary(fit2))
+```
+Again, the coefficient on the smoking indicator would only represent a causal effect if whether or not a mother smokes during pregnancy was determined completely randomly. In this case, this is an unreasonable assumption because this is not something that can be randomly assigned (nor is it in real life), and smoking during pregnancy is probably correlated with other covariates in this data set (such as alcohol, education, etc.). The tobacco coefficient is roughly 30 units lower in this regression than in the previous one. This is probably because it is correlated with some of the other covariates. In essence, the overall effect is distributed between the highly correlated covariates, whereas it is only captured by the smoking indicator in the regression above.
+
+###c)
+*See attached sheet
+
+###d)
+These two variables would be valid exclusion restrictions if they only affect a child's birth weight through whether or not a mother smoked during pregnancy. In other words, if a premature birth or dead child affected a mother's chances of smoking during her next pregnancy, but didn't affect the next child's birthweight directly.
+
+###e)
+**Paste in STATA putput table
+
+These results were obtained using MLE. One advantage of using Heckman's two-step method over MLE is that it is much easier to implement. On the other hand, MLE provides asymptotically efficient estimators (assuming normality is satisfied), and confines rho to its normal [-1,1] boundaries. According to this model, smoking during pregnancy causes a 702 gram decrease in birthweight, with a 95%CI of [-722,-683]. The estimated rho tells us that there is a correlation of .481 between the errors in the outcome equation and the errors in the selection equation. Since we have a high Chi-Square value for this rho in the test of independence, we can reject the hypothesis that the outcome and selection equations are independent. Therefore, our exclusion restrictions may actually have some effect on infant birthweight on their own, rather than only through smoking during pregnancy.
+
+###f)
+I do not trust the results from this partiular selection model. The magnitude of the effect of smoking during pregnancy on infant birthweight seems way too high to be realistic, especially considering some of the past analysis we have performed on this subject. It is not safe to trust this estimated effect because there are likely flaws in the exclusion restrictions that we included in the selection equation. Clearly these are not valid exclusions because previous premature births or previously birthing a baby that dies will have an effect on the "healthiness" (birthweight) of the next child in some way other than through smoking alone. For example, preterm and deadkids are likely variables related to the overall child-bearing ability of the mother, and so they will affect infant birthweight regardless of whether or not the mother smoked during pregnancy.
+
+###g)
+One valid instrument for this problem may be the degree of tobacco advertising the mother is exposed to. We could imagine that this would  have an effect on whether or not she smokes during pregnancy (maybe due to habit relapse from more extreme hormones, for example), but that it wouldn't affect the child's birthweight directly. This wouldn't be a perfect IV because being a past smoker would probably have something to do with the effect of the tobacco advertising. If this variable were used in an IV model, we would no longer be estimating the ATE of smoking during pregnancy on birthweight for all mothers, but instead we would get distinct ATEs of smoking during pregnancy on birthweight for mothers that were exposed to varying degrees of tobacco advertisements. In this case, the exclusion restriction assumption would be that being exposed to tobacco ads affects whether or not a mother smokes during pregnancy, but not the infant's birthweight. Monotonicity would state that tobacco advertisements cannot have a negative effect on whether or not a mother smokes during pregnancy, which may be a poor assumption for this instrument since tobacco ads could also be perceived as a deterrent to smoking during pregnancy for some mothers.
+
+##Problem 2
+###a)
+```{r}
+fit3 = lm(dbirwt~tobacco,data = d1)
+(summary(fit3))
+CI1 = c(fit3$coefficients[2]-1.96*coef(summary(fit3))[2,2],fit3$coefficients[2]+1.96*coef(summary(fit3))[2,2])
+(CI1)
+
+fit4 = lm(dbirwt~.,data = d1)
+(coef(summary(fit4))[18,])
+CI2 = c(fit4$coefficients[18]-1.96*coef(summary(fit4))[18,2],fit4$coefficients[18]+1.96*coef(summary(fit4))[18,2])
+(CI2)
+```
+The estimated effect of smoking on birthweight is -267 and -232 for regressions one and two, respectively.
+
+###b)
+```{r}
+fit5 = rq(dbirwt~tobacco,tau=0.5, data = d1)
+  #requires "quantreg" package, tau=0.5 for median regression
+(summary(fit5))
+
+CI3 = c(fit5$coefficients[2]-1.96*coef(summary(fit5))[2,2],fit5$coefficients[2]+1.96*coef(summary(fit5))[2,2])
+(CI3)
+```
+The estimated coefficient for the smoking indicator using median regression is -259. This estimated coefficient does not represent a causal effect of smoking on birth weight. It is similar to an OLS regression but uses a different minimization condition (LAD), so we do not get causality. We can not infer the effect of smoking during pregnancy on the unconditional median of the birth weight distribution using this estimated coefficient. Instead, this coefficient gives the the effect of smoking during pregnancy on the median of the birthweight distribution conditional on the smoking indicator.
+
+###c)
+```{r}
+fit6 = rq(dbirwt~.,tau=0.5,data=d1)
+(summary(fit6))
+CI4 = c(fit6$coefficients[18]-1.96*coef(summary(fit6))[18,2],fit6$coefficients[18]+1.96*coef(summary(fit6))[18,2])
+(CI4)
+
+```
+I would interpret the coefficient on tobacco (-228) as the effect of smoking during pregnancy on the median of the conditional brthweight distribution (conditional on all covariates). This is not a causal effect for reasons similar to those stated above. The effect estimated by median regression is higher by about four grams than the effect estimated by OLS above (-228 vs. -232). This tells me that the mean effect of smoking on birthweight is slightly more extreme than the median effect. This may be because there are a few outliers that pull the mean downwards.
+
+###d)
+R documentation states that rq uses the sandwich method to compute the asymptotic vcv. While STATA has this option, it defaults to the Koenker and Bassett method, which assumes that errors are distributed i.i.d. This is not a requirement for the sandwich estimator. I like the sandwich estimator better because it does not impose this restriction, and can calculate the asymptotic variance regardless of whether or not the assumption is true. The main drawback is that negative estimates can occur using the sandwich estimator (and they did in a few cases). While this isn't a big deal in my case, it can cause issues if there are a lot of negative estimates. The sandwich estimator used by R allows for heteroskedasticity, since it does not impose the i.i.d. restriction (fur(0|X)), while the default stata estimate does not allow for heteroskedasticity (fur(0)).  
+
+###e)
+Bootstrapping estimates the asymptotic variance without imposing the restriction that the errors are i.i.d. (in other words, it uses fur(0|X)).
+```{r}
+set.seed(100)
+n=nrow(d1)
+est = matrix(nrow = 32,ncol = 10)
+for(i in 1:10) {
+  sam = sample(1:n, replace = TRUE)
+  ds = d1[sam,]
+  fit = rq(dbirwt~.,tau=0.5,data = ds)
+  est[,i] = fit$coefficients
+}
+(setob = sd(est[18,]))
+vcv = var(t(est))
+```
+This method gives us an estimate of the standard error on tobacco of FILL THIS IN. This is pretty close to the quantile regression output, especially considering that we only used 10 replications.
+
+###f)
+```{r}
+tobac = fit6$coefficients[18]
+alc = fit6$coefficients[2]
+(test = (-300-tobac-alc)/(setob+sd(est[2,])))
+
+```
+The test statistic for this null hypothesis is -1.6457, so we can barely reject the null that the effects of tobacco and alcohol together are less than or equal to -300 (critical value of 1.645 for one tail).
+
+##Problem 3
+###a)
+```{r}
+(fit7 = rq(dbirwt~tobacco,tau=0.1,data = d1))
+(fit8 = rq(dbirwt~tobacco,tau=0.25,data = d1))
+(fit9 = rq(dbirwt~tobacco,tau=0.5,data = d1))
+(fit10 = rq(dbirwt~tobacco,tau=0.75,data = d1))
+(fit11 = rq(dbirwt~tobacco,tau=0.9,data = d1))
+```
+The estimated coefficients on tobacco get closer to zero (at a slowing pace) as we increase the quantile. These coefficients can be interpreted as the effect of smoking during pregnancy on their respective conditional quantiles of infant birthweight, conditioning on the smoking indicator. We can not infer the effect of smoking during pregnancy on the unconditional quantiles of the birth weight distribution from these estimates.
+
+###b)
+```{r}
+fit12 = rq(dbirwt~.,tau=0.1,data = d1)
+fit13 = rq(dbirwt~.,tau=0.25,data = d1)
+fit14 = rq(dbirwt~.,tau=0.5,data = d1)
+fit15 = rq(dbirwt~.,tau=0.75,data = d1)
+fit16 = rq(dbirwt~.,tau=0.9,data = d1)
+
+(b.1 = fit12$coefficients[18]) #.1
+(b.25 = fit13$coefficients[18]) #.25
+(b.5 = fit14$coefficients[18]) #.5
+(b.75 = fit15$coefficients[18]) #.75
+(b.9 = fit16$coefficients[18]) #.9
+```
+After controlling for the other covariates, the coefficient on the smoking indicator is lower in magnitude than it otherwise is without controlling for the other covariates. Again, we see that the effect gets closer to zero at a slowing rate as we move up in the quantiles. Interestingly, the effect at the .90 quantile is more extreme than those at both the .75 and the .5 quantiles. These coefficients can be interpreted as the effect of smoking during pregnancy on infant birthweight, conditional on the other covariates, at respective birthweight quantiles. These effects are generally less extreme than the one we calculated using OLS in 2a), except for at the .10 quantile (though the .25 quantile is very close to the OLS estimate). The results from the analysis above imply that smoking during pregnancy has a greater negative effect on the health of a baby if the baby is prone to a low birth weight to begin with, conditional on the other covariates.
+
+###c)
+```{r}
+se.1 = coef(summary(fit12))[18,2]
+se.25 = coef(summary(fit13))[18,2]
+se.5 = coef(summary(fit14))[18,2]
+se.75 = coef(summary(fit15))[18,2]
+se.9 = coef(summary(fit16))[18,2]
+(anova(fit12,fit13,fit14,fit15,fit16,joint=FALSE))
+```
+Given the small p-value on the tobacco indicator, we can safely reject the null hypothesis that the coefficients on the tobacco indicator are the same at each quantile tested. Similar results can be seen for the variables chyper, diabete, dmar, fotherr, tripre, first, and plural.
+###d)
+```{r}
+(fit12$coefficients[29]) #.1
+(fit13$coefficients[29]) #.25
+(fit14$coefficients[29]) #.5
+(fit15$coefficients[29]) #.75
+(fit16$coefficients[29]) #.9
+```
+The coefficients on tripre0 at different quantiles follow a similar pattern to the smoking indicator, however the overall change across quantiles is far more extreme. These coefficients can be interpreted as the effect of not receiving parental care during pregnancy on infant birthweight, controlling for the covariates, at respective infant birthweight quantiles. Compared to the OLS estimate in 2a) of -120, only quantiles .10 and .25 have a value more extreme in magnitude (quantile .10 is almost 4.5x bigger). This suggests that the OLS estimate for tripre0 was pulled significantly by birthweights near and below the .10 quantile, especially considering that the conditional effect at the median was about -51. The results from this analysis imply that the effect of not receiving parental care on a child's birthweight is far, far greater for children with low birthweights than it is for children with high birthweights, conditional on the other covariates. 
+
+##Problem 4
+  The article by Angrist and Krueger (2001) outlines various uses for instrumental variables (IVs). First, the authors discuss P.G. Wright's use of IVs to obtain estimates of the elasticity of supply and demand for a wide range of products. The idea was that the IVs affected cost conditions (supply) without affecting demand, or vice versa, and could therefore be seen as a "shifter" of its respective curve. While Wright averaged IVs, using 2SLS provides a more efficient estimate of elasticity (Theil 1953).
+  IVs are also helpful for overcoming measurement error, which results in understated regression estiamtes. In this context, an IV that is uncorrelated with the measurement error but is correlated with a correctly measured covariate provides a consistent regression estiamte. This can be applied in a similar manner to models that are thought to have omitted variables. An appropriate IV in this case would be a variable that is not correlated with the omitted variable (like the measurement error), but is correlated with the covariate in question. Incorporating this IV into an IV regression would provide a consistent estimate of the covariate in question (one correlated with the IV). The authors go on to provide an example of this using compulsory schooling laws (which we worked with in Prof. James' class!).
+  The authors then go on to discuss some of the issues associated with using IVs to obtain estimates. The first is that not every individual's dependent variable is always affected by the instrument. The example they provide relates to the Vietnam War data we looked at in class. The IV in this case is whether or not an individual was drafted, which was thought to affect their veteran status but not future earnings. The issue is that there were individuals that would have served in the military regardless of if they were drafted, so the estimates obtained really only apply to individuals who were affected by the draft. Finally, the authors discuss the difficulties behind creating a good instrument. These include making an instrument that is truly uncorrelated with the omitted variable and the error term, and strongly correlated with the desired endogenous variables.
+
+##Problem 5
+The article by Koenker and Hallock (2001) discusses some of the methods behind, and uses of, quantile regression. First The authors perform a quantile regression of the market value of a firm's equity on executive compensation. They find not only that compensation tends to rise with firm size, but that variability in compensation does as well. Koenker and Hallock go on to introduce the theory behind quantile regression. It is very similar to OLS, except that, when looking at the median, the problem becomes minimizing the sum of the absolute value of the residuals. When looking at different quantiles besides the median, residuals are weighted depending on the quantile. These methods were used by Engel (1857) to show the dispersion of food expenditure as household income increases.
+  Next, the authors discuss quantile regression in the context of our problem: the effects of various mother attributes and risk factors on infant birthweight. This analysis confirms some of the results that we reached above. The main takeaway here is that there is rarely a constant effect of these covariates on birthweight at different birthweights. Instead, the effects change depending on the infant's birthweight. Koenker and Hallack explain in the next section that because of this phenomenon, there is a strong case for using the results of quantile regression more in emperical work, rather than simply looking at the conditional mean provided by OLS. This shift is also becoming backed by advances in statistical software. All in all, quantile regression can be thought of as a disciple of OLS that helps us examine data even more closely.
+
+

@@ -1,0 +1,227 @@
+---
+title: "Final"
+output: html_document
+---
+                                                                    Hunter Garfield
+                                                                    Microeconometrics
+```{r,include=FALSE}
+library(foreign)
+library(stargazer)
+library(pander)
+library(psych)
+library(nonrandom)
+library(Matching)
+setwd("~/Documents/MSE/GSE526")
+d = read.dta("paeco526_W16_final.dta")
+```
+
+
+##Problem 1
+***
+```{r,,results = "asis"}
+ols1 = lm(dbirwt~tobacco, data=d)
+stargazer(ols1, type = "html", summary=F, style = "aer", single.row = T)
+ols2 = lm(dbirwt~., data = d)
+stargazer(ols2, type = "html", summary=F, style = "aer", single.row = T)
+```
+
+The estimated ATE of smoking during pregnancy on birthweight from the first regression is -266. This is only a valid ATE if we assume that the value of the intercept is the same regardless of the treatment group. The estimated ATE of smoking during pregnancy on birthweight from the second regression is -231.98. This is only a valid ATE if we assume that the intercept and the coefficients on all of the other covariates are the same regardles of the treatment group. These are extremely strong assumptions and probably do not hold up here.
+
+##Problem 2
+***
+```{r,results='asis'}
+dtob = d[which(d$tobacco==1),] #separates into smokers and non smokers
+dtob = dtob[,-18]
+dno = d[which(d$tobacco==0),]
+dno = dno[,-18]
+mtob = colMeans(dtob)
+mno = colMeans(dno)
+mdiff = mtob-mno #find difference in means
+
+ts = numeric(ncol(dtob))
+pvs = numeric(ncol(dtob))
+for(i in 1:ncol(dtob)){ #perform t test for each covariate
+  t = t.test(dtob[,i],dno[,i],mu=0,conf.level = .95)
+  ts[i] = t$statistic
+  pvs[i] = t$p.value
+}
+
+p2t = data.frame(cbind(mtob, mno, mdiff, ts, pvs))
+p2t = p2t[-5,]
+colnames(p2t) = c(".Mean Tobacco      .","Mean No Tobacco      .","Difference in Means      .","Test Statistic      .","Pr>|t|   ")
+stars = add.significance.stars(p2t[,5])
+p2t[,3] = as.character(p2t[,3])
+p2t[,3] = strtrim(p2t[,3],width = 7)
+p2t[,3] = paste(p2t[,3],stars,sep="") #add stars to diff in means column
+
+p2t = stargazer(p2t, type = "html",title = "Summary Mean Characteristics",summary = F,digits = 4,column.sep.width = "50pt")
+```
+
+This table confirms our reservations about the assumptions made above, that the coefficients on many of these covariates obtained through OLS regression are proabably not the same between the treatment (smoking) and control (no smoking) groups. We can tell that this is proabably the case because the difference in means of almost all of these covariates between the treatment and control groups is significantly different from zero with a pretty high level of confidence (all except cardiac, diabete, and plural, so 27 in total). This table suggests that there are also likely to be many unobserved factors in which the means differ significantly between smoking and non-smoking mothers, which tells us that we can not compare these two groups on the basis of this indicator (smoking can not be thought of as randomly assigned). Therefore, running an OLS regression of birth weight on the smoking indicator would not yield an unbiased estimate of the ATE, because the smoking and non-smoking groups of mothers are not comparable. 
+
+#Problem 3
+***
+The main assumption used to conclude that pscore methods estimtate the ATE is that the treatment is unconfounded conditional on the pscore. This relies on the assumption of unconfoundedness, which states that there are no unobserved variables that effect the treatment and the outcome, controlling for all observed covariates. Once we can conclude that the treatment is unconfounded conditional on the covariates, we can also conclude that the treatment is unconfounded on the pscore, which is the probability of receiving treatment conditional on the covariates (captures conditional effect of covariates). In the context of this data set, unconfoundedness would imply that there is nothing outside of our list of covariates (alcohol, dmage, etc.) that effects whether or not a mother smokes during pregnancy and her child's birthweight. Pscore methods do not control for unobserved confounders affecting smoking during pregnancy or birthweight, but they do not need to since, by unconfoundedness, we assume that there are no such unobserved confounders. The advantage of using a pscore here is that we can adjust the treatmnt using a single value rather than conditioning it on all 30 other covariates. In relation to OLS, pscore methods are useful because unlike OLS, they do not rely on the assumption that the effects of the treatment on both the outcome and the covariates are linear and additive, which is very strong and not usually plausible. Pscore methods are less parametric and allow for more flexibility in estimation.
+
+#Problem 4
+***
+```{r,results='asis'}
+lgt = glm(tobacco~. -dbirwt, family = binomial(link = "logit"), data = d)
+  #logit of covariates on tobacco (excludes birthweight)
+stargazer(lgt, type = "html", summary=F, style = "aer", single.row = T)
+```
+```{r}
+lcfs = lgt$coefficients
+#pscores can be calculated as:
+ps = plogis(as.matrix(cbind(numeric(nrow(d))+1,d[,-c(5,18)]))%*%as.matrix(lcfs))
+
+ps = as.matrix(predict(lgt, type = "response"))
+  #both of these methods give equivalent results, a built in function gives the same:
+pscores = pscore(data = d, formula = tobacco~. -dbirwt)
+```
+
+#Problem 5
+***
+```{r}
+pwt = cbind(ps, d$tobacco)
+pst = ps[which(pwt[,2]==1)]
+psnt = ps[which(pwt[,2]==0)] #separates pscores into tobacco/no tobacco
+hnt = hist(psnt,breaks = 75,freq = F,col = rgb(1,0,0,1/2))
+ht = hist(pst, breaks = 75,freq=F, col = rgb(0,0,1,1/2),add = T)
+
+legend("topright", legend = c("Smokers","Non-Smokers"),fill = c(rgb(0,0,1,1/2),rgb(1,0,0,1/2)))
+```
+
+The histogram of the pscores tells us that these two groups are somewhat comparable in terms of their covariates. To be more precise, the groups are comparable on pscore in the pink-shaded region of the plot. We also can be reasonably sure that there will be very few, if any, pscores deleted from the left side of the distribution because the pscores of both treatment groups seem to overlap at very close to zero.
+```{r,echo=FALSE}
+Nobst = length(pst)
+Nobsnt = length(psnt)
+
+print(paste("Number of non-smokers:",Nobsnt))
+print(paste("Number of smokers:",Nobst))
+
+print("quantiles (non-smoker vs smoker)")
+(quantile(psnt, c(.01,.05,.1,.25,.5,.75,.9,.95,.99)))
+(quantile(pst, c(.01,.05,.1,.25,.5,.75,.9,.95,.99)))
+
+print("other descriptive stats (top row is non-smoker)")
+(desc = describeBy(pwt,pwt[,2]))
+```
+
+The output from these descriptive statistics (especially the min and max) tells us that the pscores of smokers and non-smokers have the same minimum (zero) so there will be no trimming of pscores from below. The max pscore of non-smokers was .98 and the max pscore of smokers was 1, so we know that we will be trimming off some observations of smokers.
+
+#Problem 6
+***
+Based on histogram, we want the min of smokers and the max of non-smokers:
+```{r}
+mint = min(pst)
+maxnt = max(psnt)
+exclmin = which(ps<=mint)
+exclmax = which(ps>=maxnt)
+cps = pwt[-c(exclmin,exclmax),] #cuts off pscores below the min of tobacco 
+    #and above the max of no tobacco
+length(cps[,1])
+```
+
+Trimming the pscores using the min-max rule results in us deleting 100,000-99,715 = 285 observations. There were actually some observations trimmed from below because the mins of the groups weren't exactly zero, and smokers had a higher min. The reason that we trim off the pscores that do not lie in the overlap region (pink region) is that these individuals do not have comparable counterparts in the opposite treatment group. Without being able to compare individuals with similar pscores across treatment groups, we can not estimate the ATE. After driopping individuals that do not lie in the overlap region, we are no longer estimating the ATE for the entire sample, instead, we estimate the ATE for the individuals that lie within the overlap region. 
+
+
+
+#Problem 7
+***
+```{r,include = FALSE}
+dov = d[-c(exclmin, exclmax),]
+
+dovtob = dov[which(dov$tobacco==1),]
+dovtob = dovtob[,-18]
+dovno = dov[which(dov$tobacco==0),]
+dovno = dovno[,-18]
+psovt = cps[which(cps[,2]==1),1]
+psovnt = cps[which(cps[,2]==0),1]
+```
+
+The code for this problem has not been included because it is the same as in problem two, but with the trimmed data set. Data was weighted using:
+```{r}
+dovtobw = dovtob/psovt
+dovnow = dovno/(1-psovnt)
+```
+
+Where dovtob and dovno are the observations in the overlap region for smokers and non-smokers, respectively, and psovt and psovnt are the pscores in the overlap region for smokers and non-smokers, respectively.
+
+```{r,include=FALSE}
+movtob = colMeans(dovtobw)
+movno = colMeans(dovnow)
+movdiff = as.matrix(movtob-movno)
+
+tovs = numeric(ncol(dovtob))
+povvs = numeric(ncol(dovtob))
+for(i in 1:ncol(dovtob)){
+  t = t.test(dovtobw[,i],dovnow[,i],mu=0,conf.level = .95)
+  tovs[i] = t$statistic
+  povvs[i] = t$p.value
+}
+
+p7t = data.frame(cbind(movtob, movno, movdiff, tovs, povvs))
+p7t = p7t[-5,]
+colnames(p7t) = c(".Mean Tobacco      .","Mean No Tobacco      .","Difference in Means      .","Test Statistic      .","Pr>|t|   .")
+stars = add.significance.stars(p7t[,5])
+p7t[,3] = as.character(p7t[,3])
+p7t[,3] = strtrim(p7t[,3],width = 7)
+p7t[,3] = paste(p7t[,3],stars,sep="")
+
+```
+```{r,results = 'asis'}
+stargazer(p7t, type = "html", summary=FALSE,t.auto=FALSE)
+```
+
+It appears that weighting the observations by pscore actually increased the difference in means between the two groups. These two groups are far less comparable now after implementing the weights, considering that the difference in means across treatment groups for all covariates is statistically different from zero. It is not hard to see why this might be the case. For both smokers and non-smokers, most of the pscores are centered around ~ 0.15. Therefore, when we divide a smoker observation by a typical smoker's pscore (e.g. obs./.15), we obtain a much higher number than we had before. However, when we divide a non-smoker observation by one minus a typical non-smoker pscore, we are dividing by a much bigger number (e.g. 1-.15 = .85) and therefore the observation doesn't increase as much. This creates a larger disparity between the smoker and non-smoker observations, making the mean differences greater. In this case, it appears that weighting by pscore actually doesn't help to balance the covariates between treatment and control groups.
+
+#Problem 8
+***
+```{r}
+mat = Match(Y = dov$dbirwt, Tr = dov$tobacco, X = cps[,1], estimand = "ATE", M = 1, version = "fast", ties = F)
+    #^requires "Matching", matches data based on pscore (X). M=1 finds the first closest match.             version = fast and ties = F speed up the function significantly.
+(mat$est) 
+```
+
+The estimate of the ATE (overlap region) using matching on the propensity score is roughly -231 (these estimates cary due to the function specifications). This is very similar to the result obtained in problem 1, where we used simple linear regression with all of the covariates included (-231.98). The main drawback of using the matching approach is that it takes a very long time to find matches for all 17416 individuals in the smoking sample, even when we are matching only on pscore. This problem gets significantly worse when if we decide to find more than one closest match for each individual. Another disadvantage is having to decide how many nearest matches to obtain. Increasing the number of near matches decreases the variance of the estimated outcome of each individual, but it also increases the bias in the estimate because of the dereased quality of the matches.
+
+#Problem 9
+***
+```{r,results = "asis"}
+psov = cps[,1]
+wols = lm(dbirwt~tobacco, data=dov, weights = ((dov$tobacco/psov)+((1-dov$tobacco)/(1-psov))))
+  #dov is overlap data, psov are overlap pscores
+stargazer(wols, type = "html", summary=F, style = "aer", single.row = T)
+```
+
+The estimate of the ATE (overlap region) using weighting by pscore (specifically a weighted OLS) is -232.55.
+
+#Problem 10
+***
+```{r,results = "asis"}
+mwols = wols = lm(dbirwt~., data=dov, weights = ((dov$tobacco/psov)+((1-dov$tobacco)/(1-psov))))
+stargazer(mwols, type = "html", summary=F, style = "aer", single.row = T)
+```
+
+Using a mixture of weighting and OLS gives us an estimate of the ATE of -222.71 (for the overlap region). The advantage of using a mix of weighting and OLS as compared to just OLS is that it allows us to further balance the remaining unbalanced covariates not accounted for through a simpler weighted OLS. It also increases the efficiency of the estimates.
+
+#Problem 11
+***
+```{r}
+(ols2$coefficients[18])
+(mat$est)
+(mwols$coefficients[18])
+```
+
+The estimates of the ATE obtained using linear regression, matching on pscore, and mixed weighting are -231.98, -232.09, and -222.71, repsectively. Ideally, we would like to trust the estimates that are based on pscore matching and mixed weighting more than we do the estimate using simple linear regression. In this case, however, it appears that using pscore to weight observations was not very helpful because it actually made the treatment and control groups less comparable (as in Problem 7). We may be able to trust the estimates obtained from matching a bit more because this method only compares individuals on pscore rather than weighting the observations, which led to problems as discussed in problem 7. Even then, matching does not provide a much different estimate from OLS, especially considering how time consuming it is to run the program. Based on these results, I think it is prudent to use either the OLS estimate or the matching estimate, but not the estimate obtained through weighted regression since it relies on pscore weights that do not make the groups comparable.
+
+#Problems 12 & 13
+***
+*See attached calculations sheets
+
+
+
+
+
+

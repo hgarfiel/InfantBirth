@@ -10,5 +10,5 @@ This analysis runs Probit and Logit regressions on the variables included in the
 These files contain Least Squares analysis of similar data sets that have been either truncated or censored at specific infant birth weights.
 
 ###Caus_Quant
-These files 
+These files contain analyses in which I tried to estimate causal effects of the given explanatory variables on infant mortality rather than the associations that were determined in the previous groups. Causality was estimated using
 

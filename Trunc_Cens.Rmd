@@ -1,0 +1,106 @@
+---
+title: "PS2"
+output: word_document
+---
+
+```{r, include=FALSE}
+setwd("~/Documents/MSE/GSE526")
+library(foreign)
+library(truncreg)
+library(censReg)
+dtr = read.dta("paeco526W16_ps2trun.dta")
+dfull = read.dta("paeco526W16_ps2.dta")
+```
+
+##Problem 3
+  #3a)
+
+```{r}
+dtr = dtr[,-c(18,32)] #gets rid of "preterm" and "deadkids" covariates which aren't                       mentioned in the assignment 
+fit1 = lm(dbirwt~., data = dtr)
+(summary(fit1))
+```
+
+The ordinary OLS regression indicates that smoking during pregnancy is associated with a 191 gram decrease in infant birthweight, all else equal. This is significant at a very high significance level (extremely close to zero). This is likely not an unbiased estimate of the true effect, however, because we do not have any observations on births where the child was less than 2500 grams. Had these been included in the data, we would have expected a steeper regression line which would have led to a more extreme negative estimate of the effect of tobacco on birth weight.
+
+  #3b)
+*See attached calculations sheets
+
+  #3c)
+```{r}
+trfit = truncreg(dbirwt~., data = dtr, point = 2500, direction = "left")
+  #^ requires "truncreg package", truncated at 2500 from the left
+summary(trfit)
+
+tobacest = trfit$coefficients[18]
+tobacse = coef(summary(trfit))[18,2] #gives std. error of tobacco estimate
+(tobacest)
+(tobacse)
+
+CItobtr = c(tobacest-tobacse*1.96,tobacest+tobacse*1.96) #calculates 95% CI
+(CItobtr)
+```
+
+##Problem 4
+  #4a)
+```{r}
+dc = dfull[,-c(5,18,32)] #gets rid of uncensored birthweight, "preterm" and                             "deadkids" covariates which aren't mentioned in the assignment 
+
+fit2 = lm(cdbirwt2500~., data = dc)
+(summary(fit2))
+```
+
+This ordinary OLS regression indicates that smoking tobacco during pregnancy is associated with a 214 gram decrease in birthweight, all else equal. This is significant at a very high significance level. This is probably not an unbiased estimate of the true effect of smoking during pregnancy on birthweight for similar reasons as in the truncated model. In this case, we actually observe the birthweights that were truncated in the previous data, but they are limited to 2500 and can't go lower regardless of their true value. This gives more data points in the low birthweight area, which leads to a slightly steeper OLS line and a slightly more accurate estimate of the true value, though it is still incorrect.
+
+  #4b)
+*See attached calculations sheet
+
+  #4c)
+```{r}
+dc = dfull[,-c(5,18,32)] #gets rid of uncensored birthweight, "preterm" and                             "deadkids" covariates which aren't mentioned in the assignment 
+
+fit2 = lm(cdbirwt2500~., data = dc)
+(summary(fit2))
+
+cnsfit = censReg(cdbirwt2500~., data = dc, left = 2500, right = Inf,method="BHHH")
+            #^requires "censReg" package, censored left at 2500, right at Inf
+(summary(cnsfit))
+
+tobacestcns = cnsfit$estimate[18]
+tobacsecns = coef(summary(cnsfit))[18,2]
+(tobacestcns)
+(tobacsecns)
+
+CItobcns = c(tobacestcns-tobacsecns*1.96,tobacestcns+tobacsecns*1.96)
+(CItobcns)
+```
+##Problem 5
+  #5a)
+```{r}
+dfull = dfull[,-c(18,32,35)]#gets rid of "preterm", "deadkids", and "cdbirwt2500"                               covariates which aren't mentioned in the assignment 
+
+fullfit = lm(dbirwt~., data = dfull)
+(summary(fullfit))
+
+tobacestfull = fullfit$coefficients[18]
+tobacsefull = coef(summary(fullfit))[18,2]
+(tobacestfull)
+(tobacsefull)
+
+CIfull = c(tobacestfull-tobacsefull*1.96,tobacestfull+tobacsefull*1.96)
+(CIfull)
+```
+
+  #5b)
+```{r}
+efftobac = c(fit1$coefficients[18], tobacest,fit2$coefficients[18],cnsfit$estimate[18],tobacestfull)
+names(efftobac)= c("truncOLS", "truncModel", "censOLS", "censModel", "fullOLS")
+
+(efftobac)
+```
+This table confirms some of the hypotheses stated above concerning the effects of truncated and censored data on estimated effects. Truncated data appears to lead to a stronger bias toward zero because there is no data pulling the OLS line toward its true value. Censored data has a similar effect, but it is less extreme because we still observe the data, just at a cutoff point instead of at its true value. The results provided here seem to indicate that the truncated model actually provides a better estimate of the true OLS estimate than the censored model. This may be because shifting the distribution of the observed data to account for the unobserved data (truncated model) better captures the true distribution than estimating a true distribution for observed data and only a mass point for unobserved data (censored model). In any case, both models are  biased toward zero compared to the true OLS model, but it seems that they do a good job of predicting OLS.
+
+##Problem 6
+  The paper by Chay and Powell discusses a few different kinds of semiparametric models that can be used to estimate effects when given censored data. The authors use earnings data on black and white US citizens in the 60s, which is censored right at the taxable maximum, to examine if there was any convergence in earnings inequality during the civil rights movement.
+  Chay and Powell discuss censored regression first, stating that it is a useful tool when the distribution of the error term is known and has constant variance. This allows for the use of Maximum Likelihood Estimation. When the distribrution is unknown or the errors are thought to be heteroskedastic, other models, specifically censored least absolute deviation (CLAD), symmetrically censored least squares (SCLS), or identically censored least absolute deviations (ICLAD), can be used (given certain assumptions about the distribution of the error terms). CLAD essentially makes use of a median regression rather than a standard mean one. The idea is that if the median is within the uncensored range, it will be unaffected by censored data outside the range. SCLS re-censors the dependant variable so that it is symmetric around X'B, and estimates are obtained using least squares. ICLAD focuses on the differences between two censored dependent variables. These two dependent variables will become symmetric about their difference and estimates can be derived from minimizing the sum of squared residuals of these diferences across the observations.
+  Chay and Powell apply these methods to the 60s earnings data to show how they deviate from ordinary OLS on censored data. The CLAD, SCLS, and ICLAD effects are significantly more extreme than OLS, OLS with the censored data deleted, and MLE estimates indicating that OLS and simple MLE are biased in predicting efects from censored data. In addition, these semiparametric models can provide some information about the sources of model misspecification using OLS and MLE. Overall, the "new" methods used illustrate a larger narrowing of the wage gap following the civil rights movement than could otherwise be estimated in a parametric approach.

@@ -6,5 +6,8 @@ These analyses are broken up into different types of files that share names. .R 
 ###Prob_Log
 This analysis runs Probit and Logit regressions on the variables included in the data set in order to determine significant predictors of infant mortality. Whether or not the mother smoked or drank alcohol during the pregnancy became the focus of the analysis. Some of the notable output in this analysis are average effects of smoking and drinking on infant mortality, effects at the mean of the same, and marginal effects, most of which are accompanied by confidence intervals. The analysis also includes an ordered probit model in which the predictor variables are used to determine the probability that a mother received a certain level of prenatal care during pregnancy.
 
+###Trunc_Cens
+These files contain Least Squares analysis of similar data sets that have been either truncated or censored at specific infant birth weights.
 
+###
 
